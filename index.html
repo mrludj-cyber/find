@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e1e">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JAV Scanner (MissAV High Speed)</title>
+    <style>
+        /* [스타일] 다크 모드 */
+        body { background-color: #121212; color: #e0e0e0; font-family: sans-serif; margin: 0; padding: 10px; padding-bottom: 50px; }
+        * { box-sizing: border-box; }
+        a { text-decoration: none; color: inherit; }
+
+        /* [검색창] */
+        .search-panel {
+            background-color: #1e1e1e; padding: 15px; border-radius: 8px; border: 1px solid #333;
+            text-align: center; margin-bottom: 15px; position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .search-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+        .search-input {
+            width: 60%; padding: 10px; border-radius: 4px; border: 1px solid #555;
+            background: #2b2b2b; color: #fff; font-size: 1rem; font-weight: bold;
+        }
+        .search-btn {
+            width: 25%; padding: 10px; background-color: #0d6efd; color: white;
+            border: none; border-radius: 4px; font-weight: bold; cursor: pointer;
+        }
+
+        /* [페이징] */
+        .pagination { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; align-items: center; margin-top: 5px; }
+        .page-btn {
+            background: #333; color: #ccc; border: 1px solid #444; padding: 5px 10px;
+            border-radius: 4px; font-size: 0.8rem; cursor: pointer;
+        }
+        .page-btn:active { background: #555; }
+        .page-input { width: 40px; text-align: center; background: #222; border: 1px solid #444; color: #fff; padding: 4px; }
+
+        /* [메인] 그리드 */
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            max-width: 1200px; margin: 0 auto;
+        }
+        @media (min-width: 768px) { .container { grid-template-columns: repeat(4, 1fr); } }
+
+        /* [아이템] */
+        .item {
+            background-color: #1e1e1e; border-radius: 6px; overflow: hidden;
+            padding: 8px; text-align: center; position: relative; border: 1px solid #333;
+            display: flex; flex-direction: column;
+            min-height: 200px; 
+            transition: opacity 0.3s;
+        }
+
+        .filename {
+            font-size: 1rem; font-weight: bold; margin-bottom: 4px; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+        }
+
+        .video-title {
+            font-size: 0.75rem; color: #bbb; margin-bottom: 8px; min-height: 2.4rem;
+            line-height: 1.2; word-break: break-all;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+            transition: color 0.3s;
+        }
+
+        /* [미디어 컨테이너] */
+        .media-container {
+            position: relative; width: 100%; padding-top: 66.66%;
+            background-color: #2a2a2a; border-radius: 4px; overflow: hidden; margin-bottom: 8px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        
+        .media-container::after {
+            content: "Scanning...";
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #555; font-size: 0.8rem; font-weight: bold;
+            z-index: 0;
+        }
+
+        .media-content {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
+            cursor: pointer; z-index: 1; opacity: 0; 
+            transition: opacity 0.3s ease-in;
+            background-color: #000;
+        }
+        .media-content.loaded { opacity: 1; }
+
+        .badge-no {
+            position: absolute; top: 5px; left: 5px; width: 24px; height: 24px;
+            background-color: #ffc107; color: #000; border-radius: 50%;
+            font-weight: bold; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;
+            z-index: 10; pointer-events: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            display: none; 
+        }
+
+        .btn-group { display: flex; gap: 4px; margin-top: auto; }
+        .action-btn {
+            flex: 1; padding: 8px 0; border: none; border-radius: 4px;
+            font-size: 0.8rem; font-weight: bold; cursor: pointer; color: white;
+            transition: background-color 0.3s;
+        }
+        .btn-link { background-color: #198754; }
+        .btn-copy { background-color: #6c757d; }
+
+        .loading-msg { text-align: center; color: #888; margin-top: 20px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <div class="search-panel">
+        <div class="search-row">
+            <input type="text" id="keyword" class="search-input" placeholder="품번 (예: milk, ipz-123)" onkeypress="handleEnter(event)">
+            <button class="search-btn" onclick="startSearch()">검색</button>
+        </div>
+        
+        <div class="pagination" id="paginationControls" style="display:none;">
+            <button class="page-btn" onclick="changePage(-1)">◀</button>
+            <span id="currentPageDisplay" style="color:#fff; font-weight:bold; margin:0 5px;">Page 1</span>
+            <button class="page-btn" onclick="changePage(1)">▶</button>
+            <div style="width:100%; height:4px;"></div>
+            <button class="page-btn" onclick="jumpPage(5)">+5</button>
+            <button class="page-btn" onclick="jumpPage(10)">+10</button>
+            <input type="number" id="targetPage" class="page-input" placeholder="Go">
+            <button class="page-btn" onclick="goToPage()">이동</button>
+        </div>
+    </div>
+
+    <div id="gallery" class="container"></div>
+    <div id="loading" class="loading-msg" style="display:none;">목록 생성 중...</div>
+
+    <script>
+        let currentKeyword = "";
+        let currentPage = 1;
+        const itemsPerPage = 20;
+
+        // [설정] 제목 가져오기 배치 시스템
+        let titleQueue = [];
+        let isBatchRunning = false;
+        
+        // 요청사항: 20개 동시 요청
+        const BATCH_SIZE = 20;     
+        const BATCH_DELAY = 500;   // 배치 사이 0.5초 대기 (서버 부하 방지)
+        const MAX_RETRIES = 2;     // 재시도 횟수
+
+        function handleEnter(e) { if(e.key === 'Enter') startSearch(); }
+
+        function startSearch() {
+            const input = document.getElementById('keyword').value.trim();
+            if (!input) { alert("검색어를 입력하세요."); return; }
+
+            titleQueue = [];
+            isBatchRunning = false;
+
+            const gallery = document.getElementById('gallery');
+            const status = document.getElementById('loading');
+            
+            const specificMatch = input.match(/^([a-z]+)[-\s]?(\d+)$/i);
+
+            gallery.innerHTML = ''; 
+            status.style.display = 'block';
+
+            if (specificMatch) {
+                const code = specificMatch[1].toLowerCase();
+                const num = parseInt(specificMatch[2]);
+                document.getElementById('paginationControls').style.display = 'none';
+                createItem(code, num);
+                setTimeout(() => { status.style.display = 'none'; }, 200);
+            } else {
+                currentKeyword = input.toLowerCase();
+                currentPage = 1;
+                document.getElementById('paginationControls').style.display = 'flex';
+                renderPage();
+            }
+        }
+
+        function changePage(delta) { if (currentPage + delta < 1) return; currentPage += delta; renderPage(); }
+        function jumpPage(delta) { currentPage += delta; renderPage(); }
+        function goToPage() { const val = parseInt(document.getElementById('targetPage').value); if (val > 0) { currentPage = val; renderPage(); } }
+
+        function renderPage() {
+            titleQueue = [];
+            isBatchRunning = false;
+
+            const gallery = document.getElementById('gallery');
+            const status = document.getElementById('loading');
+            
+            gallery.innerHTML = '';
+            status.style.display = 'block';
+            document.getElementById('currentPageDisplay').innerText = `Page ${currentPage}`;
+
+            const startNum = (currentPage - 1) * itemsPerPage + 1;
+            const endNum = currentPage * itemsPerPage;
+
+            for (let i = startNum; i <= endNum; i++) {
+                createItem(currentKeyword, i);
+            }
+            
+            setTimeout(() => { status.style.display = 'none'; }, 500);
+        }
+
+        function createItem(keyword, number) {
+            const numStr = String(number).padStart(3, '0');
+            const fileId = `${keyword}-${numStr}`; 
+            
+            const uncensoredId = `${fileId}-uncensored-leak`;
+            
+            const uncThumb = `https://wsrv.nl/?url=fourhoi.com/${uncensoredId}/cover-t.jpg&q=70`;
+            const stdThumb = `https://wsrv.nl/?url=fourhoi.com/${fileId}/cover-t.jpg&q=70`;
+            const uncVideo = `https://fourhoi.com/${uncensoredId}/preview.mp4`;
+            const stdVideo = `https://fourhoi.com/${fileId}/preview.mp4`;
+
+            const stdTargetUrl = `https://missavtv.com/ko/${fileId}`;
+
+            const div = document.createElement('div');
+            div.className = 'item';
+            div.style.display = 'flex';
+            div.id = `card-${fileId}`;
+
+            div.innerHTML = `
+                <div class="filename">${fileId.toUpperCase()}</div>
+                <div class="video-title" id="title-${fileId}">...</div>
+                
+                <div class="media-container" id="media-box-${fileId}">
+                    <div class="badge-no" id="badge-${fileId}">노</div>
+                    <img 
+                        src="${stdThumb}" 
+                        class="media-content" 
+                        id="img-${fileId}"
+                        loading="lazy"
+                    >
+                </div>
+                <div class="btn-group">
+                    <button class="action-btn btn-link" id="btn-link-${fileId}" onclick="window.open('${stdTargetUrl}', '_blank')">🔗 이동</button>
+                    <button class="action-btn btn-copy" id="btn-copy-${fileId}" onclick="copyToClipboard('${stdTargetUrl}')">📋 복사</button>
+                </div>
+            `;
+            document.getElementById('gallery').appendChild(div);
+
+            const imgEl = div.querySelector(`#img-${fileId}`);
+            
+            imgEl.onload = function() {
+                this.classList.add('loaded'); 
+                this.onclick = () => playVideo(this, stdVideo, stdTargetUrl);
+                
+                // [큐] 제목 가져오기
+                addToQueue(fileId);
+
+                // [Fetch] 노모 탐지
+                detectUncensoredStrict(fileId, uncThumb, uncVideo);
+            };
+
+            imgEl.onerror = function() {
+                div.remove();
+            };
+        }
+
+        // ========================================================
+        // [1] 제목 가져오기 (MissAV 전용, 20개 병렬)
+        // ========================================================
+        
+        function addToQueue(fileId) {
+            titleQueue.push({ id: fileId, retries: 0 });
+            processBatch();
+        }
+
+        async function processBatch() {
+            if (isBatchRunning || titleQueue.length === 0) return;
+            isBatchRunning = true;
+
+            // 큐에서 20개 꺼내기
+            const batch = titleQueue.splice(0, BATCH_SIZE);
+            
+            // 병렬 요청 실행
+            const promises = batch.map(item => fetchTitleMissAV(item));
+            
+            await Promise.allSettled(promises);
+
+            setTimeout(() => {
+                isBatchRunning = false;
+                processBatch(); 
+            }, BATCH_DELAY);
+        }
+
+        async function fetchTitleMissAV(item) {
+            const titleEl = document.getElementById(`title-${item.id}`);
+            if(!titleEl) return;
+
+            if (item.retries === 0) titleEl.innerText = "스캔 중...";
+            else titleEl.innerText = "재시도...";
+
+            // [요청] MissAV 직통
+            const targetUrl = `https://missavtv.com/ko/${item.id}`;
+            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
+
+            try {
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error("Net");
+                
+                const htmlText = await response.text();
+                
+                // [정규식] <title> 태그 추출
+                // MissAV 패턴: <title>MEYD-041 제목 | MissAV</title>
+                const match = htmlText.match(/<title>(.*?)<\/title>/i);
+                
+                if (match && match[1]) {
+                    let fullTitle = match[1];
+
+                    // [정제] MissAV 불필요 텍스트 제거
+                    fullTitle = fullTitle.replace(" | MissAV", "")
+                                         .replace("무료 스트리밍", "")
+                                         .replace("Online", "");
+
+                    // [정제] 품번 제거
+                    let cleanTitle = fullTitle.replace(new RegExp(item.id, 'gi'), '').trim();
+                    cleanTitle = cleanTitle.replace(/^[-–\s]+/, ''); // 앞쪽 특수문자 제거
+
+                    if (cleanTitle && cleanTitle.length > 1) {
+                        titleEl.innerText = cleanTitle;
+                        titleEl.style.color = "#eee";
+                        return; // 성공
+                    }
+                }
+
+                throw new Error("Parse Fail");
+
+            } catch (e) {
+                // 실패 시 재시도 로직
+                item.retries++;
+                if (item.retries < MAX_RETRIES) {
+                    titleQueue.push(item); // 다시 큐 뒤로
+                } else {
+                    titleEl.innerHTML = "<span style='color:#666; font-size:0.7rem;'>정보 없음</span>";
+                }
+            }
+        }
+
+        // ========================================================
+        // [2] 노모 탐지 (기존 유지)
+        // ========================================================
+        async function detectUncensoredStrict(fileId, uncThumbUrl, uncVideoUrl) {
+            try {
+                const response = await fetch(uncThumbUrl);
+                if (!response.ok) return; 
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) return;
+
+                const card = document.getElementById(`card-${fileId}`);
+                if (card) {
+                    const badge = card.querySelector(`#badge-${fileId}`);
+                    const img = card.querySelector(`#img-${fileId}`);
+                    const btnLink = card.querySelector(`#btn-link-${fileId}`);
+                    const btnCopy = card.querySelector(`#btn-copy-${fileId}`);
+                    
+                    const uncTargetUrl = `https://missavtv.com/ko/${fileId}-uncensored-leak`;
+
+                    if (badge) badge.style.display = 'flex';
+                    if (img) img.onclick = () => playVideo(img, uncVideoUrl, uncTargetUrl);
+                    if (btnLink) {
+                        btnLink.onclick = () => window.open(uncTargetUrl, '_blank');
+                        btnLink.style.backgroundColor = '#d63384';
+                        btnLink.innerHTML = "🔗 노모 이동";
+                    }
+                    if (btnCopy) btnCopy.onclick = () => copyToClipboard(uncTargetUrl);
+                }
+            } catch (e) { }
+        }
+
+        function playVideo(element, videoUrl, targetUrl) {
+            const container = element.parentNode;
+            container.style.background = '#000';
+            const badge = container.querySelector('.badge-no');
+            if(badge) badge.style.display = 'none';
+
+            container.innerHTML = `
+                <video 
+                    src="${videoUrl}" 
+                    autoplay loop muted playsinline 
+                    class="media-content loaded"
+                    style="opacity:1;"
+                    onclick="window.open('${targetUrl}', '_blank');"
+                ></video>
+            `;
+            const video = container.querySelector('video');
+            video.onerror = function() {
+                container.innerHTML = '<div style="color:#555; font-size:0.8rem;">재생 불가</div>';
+            };
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text)
+                .then(() => alert("링크 복사 완료: " + text))
+                .catch(err => prompt("복사하세요:", text));
+        }
+    </script>
+</body>
+</html>
