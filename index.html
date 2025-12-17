@@ -335,7 +335,7 @@
             else titleEl.innerText = "재시도...";
 
             const targetUrl = `https://missav.live/ko/${item.id}`;
-            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
 
             try {
                 const response = await fetch(proxyUrl);
