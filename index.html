@@ -334,28 +334,49 @@
             if (item.retries === 0) titleEl.innerText = "스캔 중...";
             else titleEl.innerText = "재시도...";
 
-            const targetUrl = `https://www.javbus.com/${item.id}`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            const targetUrl = `https://www.njav.com/ko/xvideos/${item.id}`;
+            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
 
             try {
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error("Net");
                 
-                const htmlText = await response.text();
-                const match = htmlText.match(/<title>(.*?) - JavBus<\/title>/i);
+                const htmlText = await response.text();                
+                let rawTitle = "";
+                const ogMatch = htmlText.match(/<meta property="og:title" content="(.*?)">/i);
+                
+                if (ogMatch && ogMatch[1]) {
+                    rawTitle = ogMatch[1];
+                } else {
+                    // 우선순위 2: title 태그
+                    const titleMatch = htmlText.match(/<title>(.*?)<\/title>/i);
+                    if (titleMatch && titleMatch[1]) rawTitle = titleMatch[1];
+                }
 
-                if (match && match[1]) {
-                    let fullTitle = match[1]; // "IPZ-001 제목"                    
-                    let cleanTitle = fullTitle.replace(new RegExp(item.id, 'gi'), '').trim();                    
-                    cleanTitle = cleanTitle.replace(/^[-–\s]+/, '');                    
-                    if (!cleanTitle) cleanTitle = fullTitle;                    
-                    if (cleanTitle && cleanTitle.length > 1) {                        
-                        if (targetEl) {
-                            targetEl.innerText = cleanTitle;
-                            targetEl.style.color = "#fff";
-                        }                        
-                        return;
+                if (rawTitle) {
+                    // 4. 제목 정제 (청소) 작업
+                    // 원본 예시: "nJAV.com - 시청 IPZ-020 대상 OL… 스토커 이쿠다케 미네 HD에서 무료로 JAV 온라인 시청"
+                    
+                    let cleanTitle = rawTitle;                    
+
+                    // 불필요한 광고/사이트 문구 제거
+                    cleanTitle = cleanTitle.replace(/nJAV\.com/gi, ""); // 사이트명 제거                    
+                    cleanTitle = cleanTitle.replace(/시청/g, "");        // "시청" 제거                    
+                    cleanTitle = cleanTitle.replace(/HD에서 무료로 JAV 온라인/g, ""); // 뒤쪽 문구 제거                                        
+                    
+                    // 품번 제거 (대소문자 무시)
+                    cleanTitle = cleanTitle.replace(new RegExp(item.id, 'gi'), '').trim();
+                    
+                    // 특수문자 정리 (앞뒤에 남은 -, :, 공백 등 제거)
+                    cleanTitle = cleanTitle.replace(/^[-–\s:：]+/, '').replace(/[-–\s:：]+$/, '');
+                    
+                    // 너무 짧으면(제목이 다 지워졌으면) 실패 처리
+                    if (!cleanTitle || cleanTitle.length < 2) throw new Error("Title empty");
+                    if (titleEl) {
+                        titleEl.innerText = cleanTitle;
+                        titleEl.style.color = "#fff";
                     }
+                    return;
                 }                
                 throw new Error("Parse Fail");
             } catch (e) {
@@ -365,7 +386,7 @@
                 } else {
                     titleEl.innerHTML = "<span style='color:#666; font-size:0.7rem;'>정보 없음</span>";
                 }
-            }
+            }            
         }
 
         // ========================================================
