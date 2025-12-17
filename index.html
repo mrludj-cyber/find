@@ -263,7 +263,7 @@
             const stdThumb = `https://wsrv.nl/?url=fourhoi.com/${fileId}/cover-t.jpg&q=70`;
             const uncVideo = `https://fourhoi.com/${uncensoredId}/preview.mp4`;
             const stdVideo = `https://fourhoi.com/${fileId}/preview.mp4`;
-            const stdTargetUrl = `https://missav.live/ko/${fileId}`;
+            const stdTargetUrl = `https://missavtv.com/ko/${fileId}`;
 
             const div = document.createElement('div');
             div.className = 'item';
@@ -334,7 +334,7 @@
             if (item.retries === 0) titleEl.innerText = "스캔 중...";
             else titleEl.innerText = "재시도...";
 
-            const targetUrl = `https://missav.live/ko/${item.id}`;
+            const targetUrl = `https://missavtv.com/ko/${item.id}`;
             const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
 
             try {
