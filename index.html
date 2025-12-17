@@ -342,21 +342,32 @@
                 if (!response.ok) throw new Error("Net");
                 
                 const htmlText = await response.text();
-                const match = htmlText.match(/<title>(.*?)<\/title>/i);
-                
-                if (match && match[1]) {
-                    let fullTitle = match[1];
-                    fullTitle = fullTitle.replace(" | MissAV", "")
-                                         .replace("무료 스트리밍", "")
-                                         .replace("Online", "");
+                let rawTitle = "";
+                const ogMatch = htmlText.match(/<meta property="og:title" content="(.*?)">/i);
 
-                    let cleanTitle = fullTitle.replace(new RegExp(item.id, 'gi'), '').trim();
-                    cleanTitle = cleanTitle.replace(/^[-–\s]+/, ''); 
+                if (ogMatch && ogMatch[1]) {
+                    rawTitle = ogMatch[1];
+                } else {
+                    // 2순위: <title> 태그 추출 (Fallback)
+                    const titleMatch = htmlText.match(/<title>(.*?)<\/title>/i);
+                    if (titleMatch && titleMatch[1]) {
+                        rawTitle = titleMatch[1];
+                    }
+                }              
+                
+                
+                if (rawTitle) {
+                    let cleanTitle = rawTitle.replace(" | MissAV", "").replace("무료 스트리밍", "").replace("Online", "");
+                    cleanTitle = cleanTitle.replace(new RegExp(item.id, 'gi'), '').trim();
+                    cleanTitle = cleanTitle.replace(/^[-–\s]+/, '');
 
                     if (cleanTitle && cleanTitle.length > 1) {
-                        titleEl.innerText = cleanTitle;
-                        titleEl.style.color = "#eee";
-                        return; 
+                        // UI 업데이트
+                        if (targetEl) {
+                            targetEl.innerText = cleanTitle;
+                            targetEl.style.color = "#fff";
+                        }
+                        return;
                     }
                 }
                 throw new Error("Parse Fail");
