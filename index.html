@@ -334,7 +334,7 @@
             if (item.retries === 0) titleEl.innerText = "스캔 중...";
             else titleEl.innerText = "재시도...";
 
-            const targetUrl = `https://missav.live/ko/${item.id}`;
+            const targetUrl = `https://www.javbus.com/${item.id}`;
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
 
             try {
@@ -342,36 +342,22 @@
                 if (!response.ok) throw new Error("Net");
                 
                 const htmlText = await response.text();
-                let rawTitle = "";
-                const ogMatch = htmlText.match(/<meta property="og:title" content="(.*?)">/i);
+                const match = htmlText.match(/<title>(.*?) - JavBus<\/title>/i);
 
-                if (ogMatch && ogMatch[1]) {
-                    rawTitle = ogMatch[1];
-                } else {
-                    // 2순위: <title> 태그 추출 (Fallback)
-                    const titleMatch = htmlText.match(/<title>(.*?)<\/title>/i);
-                    if (titleMatch && titleMatch[1]) {
-                        rawTitle = titleMatch[1];
-                    }
-                }              
-                
-                
-                if (rawTitle) {
-                    let cleanTitle = rawTitle.replace(" | MissAV", "").replace("무료 스트리밍", "").replace("Online", "");
-                    cleanTitle = cleanTitle.replace(new RegExp(item.id, 'gi'), '').trim();
-                    cleanTitle = cleanTitle.replace(/^[-–\s]+/, '');
-
-                    if (cleanTitle && cleanTitle.length > 1) {
-                        // UI 업데이트
+                if (match && match[1]) {
+                    let fullTitle = match[1]; // "IPZ-001 제목"                    
+                    let cleanTitle = fullTitle.replace(new RegExp(item.id, 'gi'), '').trim();                    
+                    cleanTitle = cleanTitle.replace(/^[-–\s]+/, '');                    
+                    if (!cleanTitle) cleanTitle = fullTitle;                    
+                    if (cleanTitle && cleanTitle.length > 1) {                        
                         if (targetEl) {
                             targetEl.innerText = cleanTitle;
                             targetEl.style.color = "#fff";
-                        }
+                        }                        
                         return;
                     }
-                }
+                }                
                 throw new Error("Parse Fail");
-
             } catch (e) {
                 item.retries++;
                 if (item.retries < MAX_RETRIES) {
